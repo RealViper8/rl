@@ -3,7 +3,7 @@ opt-level = 0
 codegen-units = 255
 
 [workspace]
-members = ["rlang", "rl", "rlc"]
+members = ["rlang", "rl"]
 resolver = "3"
 
 [profile.release]
