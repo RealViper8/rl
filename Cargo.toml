@@ -1,0 +1,14 @@
+[profile.dev]
+opt-level = 0
+codegen-units = 255
+
+[workspace]
+members = ["rlang", "rl", "rlc"]
+resolver = "3"
+
+[profile.release]
+strip=true
+lto=true
+opt-level = "z"
+codegen-units = 1
+incremental = true

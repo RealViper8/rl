@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "lexer.h": "c",
+        "parser.h": "c",
+        "incl.h": "c",
+        "stdlib.h": "c",
+        "stdio.h": "c"
+    },
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer",
+        "editor.formatOnSave": true
+    }
+}
