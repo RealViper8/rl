@@ -1,35 +1,13 @@
 use menu_lib::logger::{Logger, LoggerType};
-use rlang::{interpreter::Interpreter, lexer::Lexer, parser::Parser};
+use rlang::{interpreter::Interpreter, run, run_file};
 use std::{
     env,
-    error::Error,
-    fs,
     io::{self, BufRead, BufReader, Write},
     process::exit,
 };
 
 #[path = "../menu/menu.rs"]
 mod menu_lib;
-
-fn run_file(path: &str) -> Result<(), Box<dyn Error>> {
-    let mut interpreter = Interpreter::new();
-    let contents = fs::read_to_string(path)?;
-    match run(&mut interpreter, &contents) {
-        Err(msg) => Err(msg.into()),
-        Ok(()) => Ok(()),
-    }
-}
-
-fn run(interpreter: &mut Interpreter, contents: &str) -> Result<(), String> {
-    let mut lexer = Lexer::new(contents);
-    let tokens = lexer.scan_tokens()?;
-
-    let mut parser = Parser::new(tokens.to_vec());
-    let stmts = parser.parse()?;
-    interpreter.interpret(stmts)?;
-
-    Ok(())
-}
 
 fn run_prompt() -> Result<(), String> {
     let mut interpreter = Interpreter::new();
@@ -38,7 +16,7 @@ fn run_prompt() -> Result<(), String> {
     let mut reader = BufReader::new(stdin);
 
     let mut logger = Logger::new();
-    logger.log_msg("nigma", LoggerType::Info);
+    logger.log_msg("RL Script Interpreter [V 0.1]", LoggerType::Info);
 
     logger.print_logs();
 

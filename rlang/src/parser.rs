@@ -13,7 +13,7 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, String> {
+    pub fn parse(&mut self) -> Result<Vec<Box<Stmt>>, String> {
         let mut stmts: Vec<Stmt> = vec![];
         let mut errs = vec![];
 
@@ -29,7 +29,7 @@ impl Parser {
         }
 
         if errs.is_empty() {
-            Ok(stmts)
+            Ok(stmts.iter().map(|f| Box::new(f.clone())).collect())
         } else {
             Err(errs.join("\n"))
         }
@@ -77,9 +77,79 @@ impl Parser {
             self.if_statement()
         } else if self.match_token(&TokenType::While) {
             self.while_statement()
+        } else if self.match_token(&TokenType::For) {
+            self.for_statement()
         } else {
             self.expression_statement()
         }
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt, String> {
+        self.consume(TokenType::LeftParen, "Expected '(' after for")?;
+
+        let initializer: Option<Stmt>;
+        if self.match_token(&TokenType::Semicolon) {
+            initializer = None;
+        } else if self.match_token(&TokenType::Var) {
+            let var_decl = self.var_declaration()?;
+            initializer = Some(var_decl);
+        } else {
+            let expr = self.expression_statement()?;
+            initializer = Some(expr);
+        }
+
+        let condition: Option<Expr>;
+        if !self.check(TokenType::Semicolon) {
+            let expr = self.expression()?;
+            condition = Some(expr);
+        } else {
+            condition = None;
+        }
+
+        self.consume(TokenType::Semicolon, "Expected ';' after loop condition")?;
+
+        let increment: Option<Expr>;
+        if !self.check(TokenType::RightParen) {
+            let expr = self.expression()?;
+            increment = Some(expr);
+        } else {
+            increment = None;
+        }
+
+        self.consume(TokenType::RightParen, "Expected ')' after for clauses")?;
+
+        let mut body = self.statement()?;
+        if let Some(then) = increment {
+            body = Stmt::Block {
+                statements: vec![
+                    Box::new(body),
+                    Box::new(Stmt::Expression { expression: then }),
+                ],
+            }
+        }
+
+        let cond;
+        match condition {
+            None => {
+                cond = Expr::Literal {
+                    value: LiteralValue::True,
+                }
+            }
+            Some(c) => cond = c,
+        }
+
+        body = Stmt::WhileStmt {
+            condition: cond,
+            body: Box::new(body),
+        };
+
+        if let Some(init) = initializer {
+            body = Stmt::Block {
+                statements: vec![Box::new(init), Box::new(body)],
+            }
+        }
+
+        Ok(body)
     }
 
     fn while_statement(&mut self) -> Result<Stmt, String> {
@@ -122,7 +192,12 @@ impl Parser {
         }
 
         self.consume(TokenType::RightBrace, "Expected '}' after a block")?;
-        Ok(Stmt::Block { statements })
+        Ok(Stmt::Block {
+            statements: statements
+                .iter()
+                .map(|item| Box::new(item.clone()))
+                .collect::<Vec<Box<Stmt>>>(),
+        })
     }
 
     fn check(&mut self, ty: TokenType) -> bool {
@@ -149,7 +224,6 @@ impl Parser {
         let expr = self.or()?;
 
         if self.match_token(&TokenType::Equal) {
-            //let equals = self.previous();
             let value = self.assignment()?;
 
             match expr {
@@ -409,7 +483,7 @@ mod tests {
         let one = Token {
             token_t: TokenType::Number,
             lexme: "1".to_string(),
-            literal: Some(lexer::LiteralValue::IntValue(1)),
+            literal: Some(lexer::LiteralValue::FloatValue(1.0)),
             line_number: 0,
         };
         let plus = Token {
@@ -421,7 +495,7 @@ mod tests {
         let two = Token {
             token_t: TokenType::Number,
             lexme: "2".to_string(),
-            literal: Some(lexer::LiteralValue::IntValue(2)),
+            literal: Some(lexer::LiteralValue::FloatValue(2.0)),
             line_number: 0,
         };
         let semi = Token {
@@ -430,17 +504,24 @@ mod tests {
             literal: None,
             line_number: 0,
         };
+        let eof = Token {
+            token_t: TokenType::Eof,
+            lexme: "".to_string(),
+            literal: None,
+            line_number: 0,
+        };
 
-        let tokens = vec![one, plus, two, semi];
+        let tokens = vec![one, plus, two, semi, eof];
         let mut parser = Parser::new(tokens);
         let parser_expr = parser.parse().unwrap();
         let str_expr = parser_expr[0].to_string();
+
         assert_eq!(str_expr, "(+ 1 2)");
     }
 
     #[test]
     fn test_comparison() {
-        let source = "1 + 2 == 5 + 7";
+        let source = "1 + 2 == 5 + 7;";
         let mut lexer = Lexer::new(&source);
         let tokens = lexer.scan_tokens().unwrap();
         let mut parser = Parser::new(tokens.to_vec());
@@ -451,12 +532,12 @@ mod tests {
 
     #[test]
     fn test_eq_with_paren() {
-        let source = "1 == (2 + 2)";
+        let source = "1 == (2 + 2);";
         let mut lexer = Lexer::new(&source);
         let tokens = lexer.scan_tokens().unwrap();
         let mut parser = Parser::new(tokens.to_vec());
         let parsed_expr = parser.parse().unwrap();
         let str_expr = parsed_expr[0].to_string();
-        assert_eq!(str_expr, "(== 1 (grouping (+ 2 2)))");
+        assert_eq!(str_expr, "(== 1 (group (+ 2 2)))");
     }
 }

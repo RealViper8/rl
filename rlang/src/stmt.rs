@@ -13,7 +13,7 @@ pub enum Stmt {
         initializer: Expr,
     },
     Block {
-        statements: Vec<Stmt>,
+        statements: Vec<Box<Stmt>>,
     },
     IfStmt {
         predicate: Expr,
@@ -24,16 +24,35 @@ pub enum Stmt {
         condition: Expr,
         body: Box<Stmt>,
     },
+    ForStmt {
+        var_decl: Option<Box<Expr>>,
+        expr_stmt: Option<Box<Stmt>>,
+
+        condition: Expr,
+        then: Option<Expr>,
+
+        body: Box<Stmt>,
+    },
 }
 
 impl std::fmt::Display for Stmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s: String = match self {
-            Self::WhileStmt { condition, body } => todo!(),
-            Self::IfStmt {
-                predicate,
+            Self::ForStmt {
+                var_decl,
+                expr_stmt,
+                condition,
                 then,
-                r#else,
+                body: _,
+            } => todo!(),
+            Self::WhileStmt {
+                condition: _,
+                body: _,
+            } => todo!(),
+            Self::IfStmt {
+                predicate: _,
+                then: _,
+                r#else: _,
             } => todo!(),
             Self::Block { statements } => {
                 format!(

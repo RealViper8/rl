@@ -3,6 +3,7 @@ use std::{
     io::{self, Write},
 };
 
+#[allow(dead_code)]
 #[derive(Hash, PartialEq, Eq)]
 #[repr(u8)]
 pub enum LoggerType {

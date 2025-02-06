@@ -1,10 +1,10 @@
 use crate::expr::LiteralValue;
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Clone, Debug)]
 pub struct Environment {
     values: HashMap<String, LiteralValue>,
-    pub enclosing: Option<Rc<Environment>>,
+    pub enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
@@ -19,12 +19,12 @@ impl Environment {
         self.values.insert(name, val);
     }
 
-    pub fn get(&self, name: &str) -> Option<&LiteralValue> {
+    pub fn get(&self, name: &str) -> Option<LiteralValue> {
         let value = self.values.get(name);
 
         match (value, &self.enclosing) {
-            (Some(val), _) => Some(val),
-            (None, Some(env)) => env.get(name),
+            (Some(val), _) => Some(val.clone()),
+            (None, Some(env)) => env.borrow().get(name),
             (None, None) => None,
         }
     }
@@ -36,9 +36,7 @@ impl Environment {
                 self.values.insert(name.to_string(), value);
                 true
             }
-            (None, Some(env)) => Rc::get_mut(env)
-                .expect("Failed to get env")
-                .assign(name, value),
+            (None, Some(env)) => (env.borrow_mut()).assign(name, value),
             (None, None) => false,
         }
     }
