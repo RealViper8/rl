@@ -1,5 +1,5 @@
 use menu_lib::logger::{Logger, LoggerType};
-use rlang::{interpreter::Interpreter, run, run_file};
+use rlang::{interpreter::Interpreter, run, run_file, run_string};
 use std::{
     env,
     io::{self, BufRead, BufReader, Write},
@@ -58,6 +58,14 @@ fn run_prompt() -> Result<(), String> {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    if args.len() == 3 && args[1].chars().nth(0) == Some('e') {
+        match run_string(&args[2]) {
+            Ok(_) => (),
+            Err(msg) => println!("Error: {}", msg),
+        }
+        return;
+    }
 
     match args.len().cmp(&2) {
         std::cmp::Ordering::Greater => {
