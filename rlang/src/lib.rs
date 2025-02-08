@@ -4,6 +4,7 @@ pub mod interpreter;
 pub mod lexer;
 pub mod parser;
 pub mod stmt;
+pub mod resolver;
 
 pub fn run_file(path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut interpreter = interpreter::Interpreter::new();

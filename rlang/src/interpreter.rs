@@ -2,11 +2,11 @@ use crate::{environment::Environment, expr::LiteralValue, lexer::Token, stmt::St
 use std::{cell::RefCell, rc::Rc, time::SystemTime};
 
 pub struct Interpreter {
-    globals: Rc<RefCell<Environment>>,
-    environment: Rc<RefCell<Environment>>,
+    pub specials: Rc<RefCell<Environment>>,
+    pub environment: Rc<RefCell<Environment>>,
 }
 
-fn clock_impl(_env: Rc<RefCell<Environment>>, _args: &Vec<LiteralValue>) -> LiteralValue {
+fn clock_impl(_args: &Vec<LiteralValue>) -> LiteralValue {
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .expect("Could not get system time")
@@ -16,16 +16,16 @@ fn clock_impl(_env: Rc<RefCell<Environment>>, _args: &Vec<LiteralValue>) -> Lite
 
 impl Interpreter {
     pub fn new() -> Self {
-        let mut globals = Environment::new();
-        globals.define("clock".into(), LiteralValue::Callable {
+        let mut specials = Environment::new();
+        specials.define("clock".into(), LiteralValue::Callable {
             name: "clock".into(),
             arity: 0,
             fun: Rc::new(clock_impl),
         });
         Self {
-            globals: Rc::new(RefCell::new(Environment::new())),
+            specials: Rc::new(RefCell::new(Environment::new())),
             // environment: Rc::new(RefCell::new(Environment::new())),
-            environment: Rc::new(RefCell::new(globals)),
+            environment: Rc::new(RefCell::new(specials)),
         }
     }
 
@@ -34,8 +34,17 @@ impl Interpreter {
         environment.borrow_mut().enclosing = Some(parent);
 
         Self {
-            globals: Rc::new(RefCell::new(Environment::new())),
+            specials: Rc::new(RefCell::new(Environment::new())),
             environment,
+        }
+    }
+
+    pub fn for_anon(parent: Rc<RefCell<Environment>>) -> Self {
+        let mut env = Environment::new();
+        env.enclosing = Some(parent);
+        Self {
+            specials: Rc::new(RefCell::new(Environment::new())),
+            environment: Rc::new(RefCell::new(env)),
         }
     }
 
@@ -50,7 +59,7 @@ impl Interpreter {
                         eval = LiteralValue::Nil;
                     }
 
-                    self.globals
+                    self.specials
                         .borrow_mut()
                         .define_top_level("return".into(), eval);
                 }
@@ -61,47 +70,48 @@ impl Interpreter {
                     let body: Vec<Box<Stmt>> = body.iter().map(|b| (*b).clone()).collect();
 
                     let name_clone = name.lexme.clone();
-                    let fun_impl = move |parent_env, args: &Vec<LiteralValue>| {
-                        let mut clos_int = Interpreter::for_closure(parent_env);
+                    let parent_env = self.environment.clone();
+                    let fun_impl: Rc<dyn Fn(&Vec<LiteralValue>) -> LiteralValue> =
+                        Rc::new(move |args: &Vec<LiteralValue>| {
+                            let mut clos_int = Interpreter::for_closure(parent_env.clone());
 
-                        for (i, arg) in args.iter().enumerate() {
-                            clos_int
-                                .environment
-                                .borrow_mut()
-                                .define(params[i].lexme.clone(), (*arg).clone());
-                        }
-
-                        for i in 0..(body.len()) {
-                            clos_int
-                                .interpret(vec![body[i].as_ref()])
-                                .expect(&format!("Evaluating failed inside {}", name_clone));
-
-                            if let Some(value) = clos_int.globals.borrow_mut().get("return") {
-                                //clos_int.environment.borrow_mut().delete("return");
-                                return value;
-                            }
-
-                            if let Stmt::ReturnStmt {
-                                keyword: _,
-                                value: _,
-                            } = *body[i].clone()
-                            {
-                                let value = clos_int
+                            for (i, arg) in args.iter().enumerate() {
+                                clos_int
                                     .environment
-                                    .borrow()
-                                    .get("return")
-                                    .unwrap_or(LiteralValue::Nil);
-                                return value;
+                                    .borrow_mut()
+                                    .define(params[i].lexme.clone(), (*arg).clone());
                             }
-                        }
 
-                        LiteralValue::Nil
-                    };
+                            for i in 0..(body.len()) {
+                                clos_int
+                                    .interpret(vec![body[i].as_ref()])
+                                    .expect(&format!("Evaluating failed inside {}", name_clone));
+
+                                if let Some(value) = clos_int.specials.borrow().get("return") {
+                                    return value;
+                                }
+
+                                // if let Stmt::ReturnStmt {
+                                //     keyword: _,
+                                //     value: _,
+                                // } = *body[i].clone()
+                                // {
+                                //     let value = clos_int
+                                //         .environment
+                                //         .borrow()
+                                //         .get("return")
+                                //         .unwrap_or(LiteralValue::Nil);
+                                //     return value;
+                                // }
+                            }
+
+                            LiteralValue::Nil
+                        });
 
                     let callable = LiteralValue::Callable {
                         name: name.to_string(),
                         arity,
-                        fun: Rc::new(fun_impl),
+                        fun: fun_impl,
                     };
 
                     self.environment.borrow_mut().define(name.lexme, callable);

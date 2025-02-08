@@ -201,3 +201,59 @@ fn interpret_fn_nested() {
     assert_eq!(lines[0], "2");
     assert_eq!(lines[1], "3");
 }
+
+#[test]
+fn interpret_fn_closure() {
+    let path = Path::new("cases/fn_closure.rl");
+    let output = Command::new("cargo")
+        .args(["run", "-p", "rl", "--", &path.display().to_string()])
+        .output()
+        .unwrap();
+
+    let lines = std::str::from_utf8(output.stdout.as_slice())
+        .unwrap()
+        .split('\n')
+        .collect::<Vec<&str>>();
+
+    assert_eq!(lines.len(), 5, "Output: '{}'", lines.join("\n"));
+    assert_eq!(lines[0], "1");
+    assert_eq!(lines[1], "2");
+    assert_eq!(lines[2], "1");
+    assert_eq!(lines[3], "2");
+}
+
+#[test]
+fn interpret_fn_anon() {
+    let path = Path::new("cases/fn_anon.rl");
+    let output = Command::new("cargo")
+        .args(["run", "-p", "rl", "--", &path.display().to_string()])
+        .output()
+        .unwrap();
+
+    let lines = std::str::from_utf8(output.stdout.as_slice())
+        .unwrap()
+        .split('\n')
+        .collect::<Vec<&str>>();
+
+    assert_eq!(lines.len(), 4, "Output: '{}'", lines.join("\n"));
+    assert_eq!(lines[0], "1");
+    assert_eq!(lines[1], "2");
+    assert_eq!(lines[2], "3");
+}
+
+#[test]
+fn interpret_fn_anon2() {
+    let path = Path::new("cases/fn_anon2.rl");
+    let output = Command::new("cargo")
+        .args(["run", "-p", "rl", "--", &path.display().to_string()])
+        .output()
+        .unwrap();
+
+    let lines = std::str::from_utf8(output.stdout.as_slice())
+        .unwrap()
+        .split('\n')
+        .collect::<Vec<&str>>();
+
+    assert_eq!(lines.len(), 2, "Output: '{}'", lines.join("\n"));
+    assert_eq!(lines[0], "1");
+}

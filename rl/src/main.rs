@@ -9,6 +9,15 @@ use std::{
 #[path = "../menu/menu.rs"]
 mod menu_lib;
 
+const DISPLAY_FUNC: &dyn Fn() -> () = &|| {
+    println!(
+        "\x1b[1;36mRL:
+\x1b[0;32mhelp\x1b[1;35m:\t\t\x1b[0;36mShows this
+\x1b[0;32mquit \x1b[1;35m| \x1b[0;32mq \x1b[1;35m| \x1b[0;32mexit\x1b[1;35m:\t\x1b[0;36mQuits the Interpreter
+\x1b[0;32mhelp\x1b[1;35m:\t\t\x1b[0;36mShows this"
+    );
+};
+
 fn run_prompt() -> Result<(), String> {
     let mut interpreter = Interpreter::new();
     let stdin = io::stdin();
@@ -28,7 +37,11 @@ fn run_prompt() -> Result<(), String> {
 
         match buffer.to_lowercase().trim() {
             "exit" | "quit" | "q" => break,
-            "help" => println!("\x1b[1;36mRL"),
+            "help" | "?" => {
+                DISPLAY_FUNC();
+                buffer.clear();
+                continue;
+            }
             _ => (),
         }
 

@@ -276,7 +276,59 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr, String> {
+        // if self.match_token(&TokenType::Fn) {
+        //     self.function_expression()
+        // } else {
+        //     self.assignment()
+        // }
         self.assignment()
+    }
+
+    fn function_expression(&mut self) -> Result<Expr, String> {
+        let paren = self.consume(
+            TokenType::LeftParen,
+            "Expected '(' after anonymous function",
+        )?;
+        let mut parameters = vec![];
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    let location = self.peek().line_number;
+                    return Err(format!(
+                        "line {location}: Cant have more than 255 arguments"
+                    ));
+                }
+
+                let param = self.consume(TokenType::Identifier, "Expected parameter name")?;
+                parameters.push(param);
+
+                if !self.match_token(&TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(
+            TokenType::RightParen,
+            "Expected ')' after anonymous function paramters",
+        )?;
+        self.consume(
+            TokenType::LeftBrace,
+            "Expected '{' after anonymous function decleration",
+        )?;
+
+        let body = match self.block_statement()? {
+            Stmt::Block { statements } => statements,
+            _ => panic!(
+                "Drink iced coffee panic attack (Block statement parsed something that was not a block)"
+            ),
+        };
+
+        Ok(Expr::AnonFunction {
+            paren,
+            arguments: parameters,
+            body,
+        })
     }
 
     fn assignment(&mut self) -> Result<Expr, String> {
@@ -493,6 +545,10 @@ impl Parser {
                 result = Expr::Literal {
                     value: LiteralValue::from(token),
                 }
+            }
+            TokenType::Fn => {
+                self.advance();
+                result = self.function_expression()?;
             }
             TokenType::Identifier => {
                 self.advance();

@@ -1,6 +1,8 @@
 use crate::{
     environment::Environment,
+    interpreter::Interpreter,
     lexer::{self, Token, TokenType},
+    stmt::Stmt,
 };
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
@@ -14,7 +16,7 @@ pub enum LiteralValue {
     Callable {
         name: String,
         arity: usize,
-        fun: Rc<dyn Fn(Rc<RefCell<Environment>>, &Vec<LiteralValue>) -> LiteralValue>,
+        fun: Rc<dyn Fn(&Vec<LiteralValue>) -> LiteralValue>,
     },
 }
 
@@ -119,6 +121,11 @@ impl std::fmt::Display for LiteralValue {
 
 #[derive(Clone)]
 pub enum Expr {
+    AnonFunction {
+        paren: Token,
+        arguments: Vec<Token>,
+        body: Vec<Box<Stmt>>,
+    },
     Assign {
         name: Token,
         value: Box<Expr>,
@@ -156,6 +163,47 @@ pub enum Expr {
 impl Expr {
     pub fn evaluate(&self, environment: Rc<RefCell<Environment>>) -> Result<LiteralValue, String> {
         match self {
+            Expr::AnonFunction {
+                paren,
+                arguments,
+                body,
+            } => {
+                let arity = arguments.len();
+                let env = environment.clone();
+                let arguments: Vec<Token> = arguments.iter().map(|t| (*t).clone()).collect();
+                let body: Vec<Box<Stmt>> = body.iter().map(|b| (*b).clone()).collect();
+                let paren = paren.clone();
+
+                let fun_impl: Rc<dyn Fn(&Vec<LiteralValue>) -> LiteralValue> =
+                    Rc::new(move |args: &Vec<LiteralValue>| {
+                        let mut anon_int = Interpreter::for_anon(env.clone());
+                        for (i, arg) in args.iter().enumerate() {
+                            anon_int
+                                .environment
+                                .borrow_mut()
+                                .define(arguments[i].lexme.clone(), (*arg).clone());
+                        }
+
+                        for i in 0..(body.len()) {
+                            anon_int.interpret(vec![&body[i]]).expect(&format!(
+                                "Evaluating failed inside anon function at line {}",
+                                paren.line_number,
+                            ));
+
+                            if let Some(value) = anon_int.specials.borrow().get("return") {
+                                return value;
+                            }
+                        }
+
+                        LiteralValue::Nil
+                    });
+
+                Ok(LiteralValue::Callable {
+                    name: "anon_function".to_string(),
+                    arity,
+                    fun: fun_impl,
+                })
+            }
             Expr::Call {
                 callee,
                 paren: _,
@@ -175,7 +223,7 @@ impl Expr {
                             let val = arg.evaluate(environment.clone())?;
                             args.push(val)
                         }
-                        return Ok(fun(environment.clone(), &args));
+                        return Ok(fun(&args));
                     }
                     other => Err(format!("{} is not callable", other.as_ref()))?,
                 }
@@ -373,6 +421,11 @@ impl AsRef<str> for LiteralValue {
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let string = match self {
+            Self::AnonFunction {
+                paren: _,
+                arguments,
+                body: _,
+            } => format!("anon/{}", arguments.len()),
             Self::Call {
                 callee,
                 paren: _,
