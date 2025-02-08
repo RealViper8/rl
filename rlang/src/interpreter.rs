@@ -1,9 +1,15 @@
-use crate::{environment::Environment, expr::LiteralValue, lexer::Token, stmt::Stmt};
-use std::{cell::RefCell, rc::Rc, time::SystemTime};
+use crate::{
+    environment::Environment,
+    expr::{Expr, LiteralValue},
+    lexer::Token,
+    stmt::Stmt,
+};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, time::SystemTime};
 
 pub struct Interpreter {
     pub specials: Rc<RefCell<Environment>>,
     pub environment: Rc<RefCell<Environment>>,
+    pub locals: Rc<RefCell<HashMap<Rc<Expr>, usize>>>,
 }
 
 fn clock_impl(_args: &Vec<LiteralValue>) -> LiteralValue {
@@ -26,6 +32,7 @@ impl Interpreter {
             specials: Rc::new(RefCell::new(Environment::new())),
             // environment: Rc::new(RefCell::new(Environment::new())),
             environment: Rc::new(RefCell::new(specials)),
+            locals: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -36,6 +43,7 @@ impl Interpreter {
         Self {
             specials: Rc::new(RefCell::new(Environment::new())),
             environment,
+            locals: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -45,6 +53,7 @@ impl Interpreter {
         Self {
             specials: Rc::new(RefCell::new(Environment::new())),
             environment: Rc::new(RefCell::new(env)),
+            locals: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -165,5 +174,9 @@ impl Interpreter {
         }
 
         Ok(())
+    }
+
+    pub fn resolve(&mut self, _expr: &Expr, _steps: usize) -> Result<(), String> {
+        todo!()
     }
 }

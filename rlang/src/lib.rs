@@ -3,8 +3,8 @@ pub mod expr;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
-pub mod stmt;
 pub mod resolver;
+pub mod stmt;
 
 pub fn run_file(path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut interpreter = interpreter::Interpreter::new();
@@ -13,6 +13,11 @@ pub fn run_file(path: &str) -> Result<(), Box<dyn std::error::Error>> {
         Err(msg) => Err(msg.into()),
         Ok(()) => Ok(()),
     }
+}
+
+pub fn run_string(contents: &str) -> Result<(), String> {
+    let mut interpreter = interpreter::Interpreter::new();
+    run(&mut interpreter, contents)
 }
 
 pub fn run(interpreter: &mut interpreter::Interpreter, contents: &str) -> Result<(), String> {

@@ -4,7 +4,7 @@ use crate::{
     lexer::{self, Token, TokenType},
     stmt::Stmt,
 };
-use std::{borrow::Cow, cell::RefCell, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, hash::Hash, rc::Rc};
 
 #[derive(Clone)]
 pub enum LiteralValue {
@@ -159,6 +159,22 @@ pub enum Expr {
         name: Token,
     },
 }
+
+impl Hash for Expr {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self, state)
+    }
+}
+
+impl PartialEq for Expr {
+    fn eq(&self, other: &Self) -> bool {
+        let ptr = std::ptr::addr_of!(self);
+        let ptr2 = std::ptr::addr_of!(other);
+        ptr == ptr2
+    }
+}
+
+impl Eq for Expr {}
 
 impl Expr {
     pub fn evaluate(&self, environment: Rc<RefCell<Environment>>) -> Result<LiteralValue, String> {
@@ -461,6 +477,80 @@ impl std::fmt::Display for Expr {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn expr_is_hashable() {
+        let mut map = HashMap::new();
+        let minus_token = Token {
+            token_t: TokenType::Minus,
+            lexme: "-".to_string(),
+            literal: None,
+            line_number: 0,
+        };
+        let one_two_three = Expr::Literal {
+            value: LiteralValue::Number(123.0),
+        };
+        let group = Expr::Grouping {
+            expression: Box::new(Expr::Literal {
+                value: LiteralValue::Number(45.67),
+            }),
+        };
+        let multi = Token {
+            token_t: crate::lexer::TokenType::Star,
+            lexme: "*".to_string(),
+            literal: None,
+            line_number: 0,
+        };
+        let expr = Expr::Binary {
+            left: Box::from(Expr::Unary {
+                operator: minus_token,
+                right: Box::from(one_two_three),
+            }),
+            operator: multi,
+            right: Box::from(group),
+        };
+        let expr = std::rc::Rc::new(expr);
+        map.insert(expr.clone(), 2);
+        match map.get(&expr) {
+            Some(_) => (),
+            None => panic!("Unable to retrieve value"),
+        }
+
+        let minus_token = Token {
+            token_t: TokenType::Minus,
+            lexme: "-".to_string(),
+            literal: None,
+            line_number: 0,
+        };
+        let one_two_three = Expr::Literal {
+            value: LiteralValue::Number(123.0),
+        };
+        let group = Expr::Grouping {
+            expression: Box::new(Expr::Literal {
+                value: LiteralValue::Number(45.67),
+            }),
+        };
+        let multi = Token {
+            token_t: crate::lexer::TokenType::Star,
+            lexme: "*".to_string(),
+            literal: None,
+            line_number: 0,
+        };
+        let expr = Expr::Binary {
+            left: Box::from(Expr::Unary {
+                operator: minus_token,
+                right: Box::from(one_two_three),
+            }),
+            operator: multi,
+            right: Box::from(group),
+        };
+
+        match map.get(&expr) {
+            None => (),
+            Some(_) => panic!("Test"),
+        }
+    }
 
     #[test]
     fn pretty_print_ast() {
