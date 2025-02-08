@@ -4,13 +4,43 @@ use crate::{
 };
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone)]
 pub enum LiteralValue {
-    Number(f32),
+    Number(f64),
     StringValue(String),
     True,
     False,
     Nil,
+    Callable {
+        name: String,
+        arity: usize,
+        fun: Rc<dyn Fn(Rc<RefCell<Environment>>, &Vec<LiteralValue>) -> LiteralValue>,
+    },
+}
+
+impl PartialEq for LiteralValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (LiteralValue::Number(x), LiteralValue::Number(y)) => x == y,
+            (
+                LiteralValue::Callable {
+                    name,
+                    arity,
+                    fun: _,
+                },
+                Self::Callable {
+                    name: name2,
+                    arity: arity2,
+                    fun: _,
+                },
+            ) => name == name2 && arity == arity2,
+            (LiteralValue::StringValue(x), LiteralValue::StringValue(y)) => x == y,
+            (LiteralValue::True, LiteralValue::True) => true,
+            (LiteralValue::False, LiteralValue::False) => true,
+            (LiteralValue::Nil, LiteralValue::Nil) => true,
+            _ => false,
+        }
+    }
 }
 
 impl LiteralValue {
@@ -33,12 +63,22 @@ impl LiteralValue {
             Self::True => Self::False,
             Self::False => Self::True,
             Self::Nil => Self::True,
+            Self::Callable {
+                name: _,
+                arity: _,
+                fun: _,
+            } => panic!("Cannot use callable as a falsy value"),
         }
     }
     pub fn is_truthy(&self) -> LiteralValue {
         match self {
+            Self::Callable {
+                name: _,
+                arity: _,
+                fun: _,
+            } => panic!("Cannot use callable as a truthy value"),
             Self::Number(x) => {
-                if *x == 0.0 as f32 {
+                if *x == 0.0 as f64 {
                     Self::False
                 } else {
                     Self::True
@@ -61,6 +101,11 @@ impl LiteralValue {
 impl std::fmt::Display for LiteralValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s: Cow<str> = match self {
+            Self::Callable {
+                name,
+                arity,
+                fun: _,
+            } => Cow::Owned(format!("{name}{arity}")),
             Self::Number(x) => Cow::Owned(x.to_string()),
             Self::StringValue(x) => Cow::Borrowed(x),
             Self::True => Cow::Borrowed("true"),
@@ -72,7 +117,7 @@ impl std::fmt::Display for LiteralValue {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Expr {
     Assign {
         name: Token,
@@ -82,6 +127,11 @@ pub enum Expr {
         left: Box<Expr>,
         operator: Token,
         right: Box<Expr>,
+    },
+    Call {
+        callee: Box<Expr>,
+        paren: Token,
+        arguments: Vec<Expr>,
     },
     Grouping {
         expression: Box<Expr>,
@@ -106,6 +156,31 @@ pub enum Expr {
 impl Expr {
     pub fn evaluate(&self, environment: Rc<RefCell<Environment>>) -> Result<LiteralValue, String> {
         match self {
+            Expr::Call {
+                callee,
+                paren: _,
+                arguments,
+            } => {
+                let callable = (*callee).evaluate(environment.clone())?;
+                match callable {
+                    LiteralValue::Callable { name, arity, fun } => {
+                        if arguments.len() != arity {
+                            return Err(format!(
+                                "Callable {name} expected {arity} arguments got {}",
+                                arguments.len()
+                            ));
+                        }
+                        let mut args = vec![];
+                        for arg in arguments {
+                            let val = arg.evaluate(environment.clone())?;
+                            args.push(val)
+                        }
+                        return Ok(fun(environment.clone(), &args));
+                    }
+                    other => Err(format!("{} is not callable", other.as_ref()))?,
+                }
+                todo!()
+            }
             Expr::Assign { name, value } => {
                 let new_value = (*value).evaluate(environment.clone())?;
                 let assign_success = environment
@@ -186,10 +261,10 @@ impl Expr {
                     (LiteralValue::Number(x), TokenType::Star, LiteralValue::Number(y)) => {
                         Ok(LiteralValue::Number(x * y))
                     }
-
-                    (LiteralValue::StringValue(_), op, LiteralValue::Number(_)) => {
-                        Err(format!("{} is not defined for String and Number", op,))
+                    (LiteralValue::StringValue(s), TokenType::Plus, LiteralValue::Number(x)) => {
+                        Ok(LiteralValue::StringValue(format!("{}{}", &s, &x)))
                     }
+
                     (LiteralValue::Number(_), op, LiteralValue::StringValue(_)) => {
                         Err(format!("{} is not defined for String and Number", op))
                     }
@@ -231,9 +306,15 @@ impl Expr {
     }
 }
 
+impl std::fmt::Debug for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
 trait LiteralValueExt {
     fn unwrap_as_string(&self) -> Cow<str>;
-    fn unwrap_as_f32(&self) -> f32;
+    fn unwrap_as_f64(&self) -> f64;
 }
 
 impl LiteralValueExt for Option<lexer::LiteralValue> {
@@ -244,10 +325,10 @@ impl LiteralValueExt for Option<lexer::LiteralValue> {
             _ => panic!("Could not unwrap as string"),
         }
     }
-    fn unwrap_as_f32(&self) -> f32 {
+    fn unwrap_as_f64(&self) -> f64 {
         match self {
-            Some(lexer::LiteralValue::IntValue(s)) => *s as f32,
-            Some(lexer::LiteralValue::FloatValue(s)) => *s as f32,
+            Some(lexer::LiteralValue::IntValue(s)) => *s as f64,
+            Some(lexer::LiteralValue::FloatValue(s)) => *s as f64,
             _ => panic!("Could not unwrap as f32"),
         }
     }
@@ -257,7 +338,7 @@ impl From<Token> for LiteralValue {
     fn from(value: Token) -> Self {
         match value.token_t {
             TokenType::String => Self::StringValue(value.literal.unwrap_as_string().to_string()),
-            TokenType::Number => Self::Number(value.literal.unwrap_as_f32()),
+            TokenType::Number => Self::Number(value.literal.unwrap_as_f64()),
 
             TokenType::False => Self::False,
             TokenType::True => Self::True,
@@ -278,7 +359,11 @@ impl AsRef<str> for LiteralValue {
         match self {
             &LiteralValue::StringValue(_) => "String",
             &LiteralValue::Number(_) => "Number",
-
+            &LiteralValue::Callable {
+                name: _,
+                arity: _,
+                fun: _,
+            } => "Callable",
             &LiteralValue::True | &LiteralValue::False => "Boolean",
             &LiteralValue::Nil => "nil",
         }
@@ -288,6 +373,13 @@ impl AsRef<str> for LiteralValue {
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let string = match self {
+            Self::Call {
+                callee,
+                paren: _,
+                arguments,
+            } => {
+                format!("({} {:?})", (*callee), arguments)
+            }
             Self::Logical {
                 left,
                 operator,

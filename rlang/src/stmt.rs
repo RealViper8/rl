@@ -24,25 +24,27 @@ pub enum Stmt {
         condition: Expr,
         body: Box<Stmt>,
     },
-    ForStmt {
-        var_decl: Option<Box<Expr>>,
-        expr_stmt: Option<Box<Stmt>>,
-
-        condition: Expr,
-        then: Option<Expr>,
-
-        body: Box<Stmt>,
+    Function {
+        name: Token,
+        params: Vec<Token>,
+        body: Vec<Box<Stmt>>,
+    },
+    ReturnStmt {
+        keyword: Token,
+        value: Option<Expr>,
     },
 }
 
 impl std::fmt::Display for Stmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s: String = match self {
-            Self::ForStmt {
-                var_decl,
-                expr_stmt,
-                condition,
-                then,
+            Self::ReturnStmt {
+                keyword: _,
+                value: _,
+            } => todo!(),
+            Self::Function {
+                name: _,
+                params: _,
                 body: _,
             } => todo!(),
             Self::WhileStmt {

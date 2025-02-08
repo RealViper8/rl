@@ -8,6 +8,12 @@ pub struct Parser {
     current: usize,
 }
 
+#[derive(Debug)]
+enum FunctionKind {
+    Function,
+    Method,
+}
+
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self { tokens, current: 0 }
@@ -37,16 +43,52 @@ impl Parser {
 
     fn declaration(&mut self) -> Result<Stmt, String> {
         if self.match_token(&TokenType::Var) {
-            match self.var_declaration() {
-                Ok(stmt) => Ok(stmt),
-                Err(msg) => {
-                    // self.synchronize();
-                    Err(msg)
-                }
-            }
+            self.var_declaration()
+        } else if self.match_token(&TokenType::Fn) {
+            self.function(FunctionKind::Function)
         } else {
             self.statement()
         }
+    }
+
+    fn function(&mut self, kind: FunctionKind) -> Result<Stmt, String> {
+        let name = self.consume(TokenType::Identifier, &format!("Expected {kind:?} name"))?;
+        self.consume(
+            TokenType::LeftParen,
+            &format!("Expected '(' after {kind:?} name"),
+        )?;
+
+        let mut params: Vec<Token> = vec![];
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if params.len() >= 255 {
+                    let location = self.peek().line_number;
+                    return Err(format!(
+                        "Line {location}: Cant have more than 255 arguments"
+                    ));
+                }
+
+                let param = self.consume(TokenType::Identifier, "Expected paramter name")?;
+                params.push(param);
+
+                if !self.match_token(&TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenType::RightParen, "Expected ')' after parameters.")?;
+        self.consume(
+            TokenType::LeftBrace,
+            &format!("Expected '{{' {kind:?} body."),
+        )?;
+
+        let body = match self.block_statement()? {
+            Stmt::Block { statements } => statements,
+            _ => panic!("Block statement parsed something that was not a block"),
+        };
+
+        Ok(Stmt::Function { name, params, body })
     }
 
     fn var_declaration(&mut self) -> Result<Stmt, String> {
@@ -79,9 +121,26 @@ impl Parser {
             self.while_statement()
         } else if self.match_token(&TokenType::For) {
             self.for_statement()
+        } else if self.match_token(&TokenType::Return) {
+            self.return_statement()
         } else {
             self.expression_statement()
         }
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt, String> {
+        let keyword = self.previous();
+        let value;
+
+        if !self.check(TokenType::Semicolon) {
+            value = Some(self.expression()?);
+        } else {
+            value = None;
+        }
+
+        self.consume(TokenType::Semicolon, "Expected ';' after return value")?;
+
+        Ok(Stmt::ReturnStmt { keyword, value })
     }
 
     fn for_statement(&mut self) -> Result<Stmt, String> {
@@ -356,8 +415,50 @@ impl Parser {
                 right: Box::from(rhs),
             })
         } else {
-            self.primary()
+            self.call()
         }
+    }
+
+    fn call(&mut self) -> Result<Expr, String> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.match_token(&TokenType::LeftParen) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr, String> {
+        let mut arguments = vec![];
+
+        if !self.check(TokenType::RightParen) {
+            loop {
+                let arg = self.expression()?;
+                arguments.push(arg);
+                if arguments.len() >= 255 {
+                    let location = self.peek().line_number;
+                    return Err(format!(
+                        "Line {location}: Cant have more than 255 arguments"
+                    ));
+                }
+
+                if !self.match_token(&TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        let paren = self.consume(TokenType::RightParen, "Expected ')' after arguments.")?;
+        Ok(Expr::Call {
+            callee: Box::new(callee),
+            paren,
+            arguments,
+        })
     }
 
     fn consume(&mut self, token_t: TokenType, msg: &str) -> Result<Token, String> {

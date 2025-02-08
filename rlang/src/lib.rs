@@ -20,7 +20,7 @@ pub fn run(interpreter: &mut interpreter::Interpreter, contents: &str) -> Result
 
     let mut parser = parser::Parser::new(tokens.to_vec());
     let stmts = parser.parse()?;
-    interpreter.interpret(stmts)?;
+    interpreter.interpret(stmts.iter().map(|b| b.as_ref()).collect())?;
 
     Ok(())
 }

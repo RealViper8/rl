@@ -1,7 +1,7 @@
 use crate::expr::LiteralValue;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Environment {
     values: HashMap<String, LiteralValue>,
     pub enclosing: Option<Rc<RefCell<Environment>>>,
@@ -12,6 +12,13 @@ impl Environment {
         Self {
             values: HashMap::<String, LiteralValue>::new(),
             enclosing: None,
+        }
+    }
+
+    pub fn define_top_level(&mut self, name: String, value: LiteralValue) {
+        match &self.enclosing {
+            None => self.define(name, value),
+            Some(env) => env.borrow_mut().define_top_level(name, value),
         }
     }
 

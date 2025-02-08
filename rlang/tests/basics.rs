@@ -91,3 +91,113 @@ fn interpret_for_loop() {
         assert_eq!(lines[i], fibo[i].to_string());
     }
 }
+
+#[test]
+fn interpret_fn_def() {
+    let path = Path::new("cases/fn_def.rl");
+    let output = Command::new("cargo")
+        .args(["run", "-p", "rl", "--", &path.display().to_string()])
+        .output()
+        .unwrap();
+
+    let lines = std::str::from_utf8(output.stdout.as_slice())
+        .unwrap()
+        .split('\n')
+        .collect::<Vec<&str>>();
+
+    assert_eq!(lines.len(), 4, "Output: '{}'", lines.join("\n"));
+    assert_eq!(lines[0], "1");
+    assert_eq!(lines[1], "2");
+    assert_eq!(lines[2], "3");
+}
+
+#[test]
+fn interpret_fn_mod_local() {
+    let path = Path::new("cases/fn_env.rl");
+    let output = Command::new("cargo")
+        .args(["run", "-p", "rl", "--", &path.display().to_string()])
+        .output()
+        .unwrap();
+
+    let lines = std::str::from_utf8(output.stdout.as_slice())
+        .unwrap()
+        .split('\n')
+        .collect::<Vec<&str>>();
+
+    assert_eq!(lines.len(), 2, "Output: '{}'", lines.join("\n"));
+    assert_eq!(lines[0], "3");
+}
+
+#[test]
+fn interpret_fn_return() {
+    let path = Path::new("cases/fn_return.rl");
+    let output = Command::new("cargo")
+        .args(["run", "-p", "rl", "--", &path.display().to_string()])
+        .output()
+        .unwrap();
+
+    let lines = std::str::from_utf8(output.stdout.as_slice())
+        .unwrap()
+        .split('\n')
+        .collect::<Vec<&str>>();
+
+    assert_eq!(lines.len(), 2, "Output: '{}'", lines.join("\n"));
+    assert_eq!(lines[0], "5");
+}
+
+#[test]
+fn interpret_fn_no_return() {
+    let path = Path::new("cases/fn_return_nil.rl");
+    let output = Command::new("cargo")
+        .args(["run", "-p", "rl", "--", &path.display().to_string()])
+        .output()
+        .unwrap();
+
+    let lines = std::str::from_utf8(output.stdout.as_slice())
+        .unwrap()
+        .split('\n')
+        .collect::<Vec<&str>>();
+
+    assert_eq!(lines.len(), 4, "Output: '{}'", lines.join("\n"));
+    assert_eq!(lines[0], "1");
+    assert_eq!(lines[1], "2");
+    assert_eq!(lines[2], "nil");
+}
+
+#[test]
+fn interpret_fn_cond_return() {
+    let path = Path::new("cases/fn_cond_return.rl");
+    let output = Command::new("cargo")
+        .args(["run", "-p", "rl", "--", &path.display().to_string()])
+        .output()
+        .unwrap();
+
+    let lines = std::str::from_utf8(output.stdout.as_slice())
+        .unwrap()
+        .split('\n')
+        .collect::<Vec<&str>>();
+
+    assert_eq!(lines.len(), 5, "Output: '{}'", lines.join("\n"));
+    assert_eq!(lines[0], "3");
+    assert_eq!(lines[1], "2");
+    assert_eq!(lines[2], "1");
+    assert_eq!(lines[3], "0");
+}
+
+#[test]
+fn interpret_fn_nested() {
+    let path = Path::new("cases/fn_nested.rl");
+    let output = Command::new("cargo")
+        .args(["run", "-p", "rl", "--", &path.display().to_string()])
+        .output()
+        .unwrap();
+
+    let lines = std::str::from_utf8(output.stdout.as_slice())
+        .unwrap()
+        .split('\n')
+        .collect::<Vec<&str>>();
+
+    assert_eq!(lines.len(), 3, "Output: '{}'", lines.join("\n"));
+    assert_eq!(lines[0], "2");
+    assert_eq!(lines[1], "3");
+}
